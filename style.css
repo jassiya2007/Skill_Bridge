@@ -38,8 +38,8 @@ a {
 ===================================================== */
 
 :root {
-    --primary: #155E63;
-    --primary-dark: #0D4145;
+   --primary: #42b883;
+   --primary-dark: #369c6f;
 
     --blue: #155E63;
     --purple: #155E63;
@@ -117,7 +117,7 @@ section {
 
     border-radius: 50px;
 
-    background: #eeecff;
+    background: #e5f7ef;
     color: var(--primary);
 
     font-size: 12px;
@@ -362,7 +362,7 @@ section {
 
     border-radius: 50%;
 
-    background: #eeeaff;
+    background: #e5f7ef;
     color: var(--primary);
 
     font-weight: 700;
@@ -404,11 +404,11 @@ section {
     display: grid;
     place-items: center;
 
-    background:
-        conic-gradient(
-            var(--primary) 0 78%,
-            #ddd9ff 78% 100%
-        );
+   background:
+     conic-gradient(
+        var(--primary) 0 78%,
+        #cceedd 78% 100%
+    );
 
     position: relative;
 }
@@ -896,7 +896,7 @@ section {
 
     border-radius: 18px;
 
-    background: #f0eeff;
+    background: #e5f7ef;
 
     font-size: 25px;
 }
@@ -994,8 +994,8 @@ section {
 }
 
 .sidebar-menu a.active {
-    background: #eeecff;
-    color: var(--primary);
+    background: #e5f7ef;
+color: var(--primary);
     font-weight: 700;
 }
 
