@@ -629,7 +629,7 @@ def read_resume_text(filename: str, content: bytes) -> str:
         return '\n'.join(paragraph.text for paragraph in Document(io.BytesIO(content)).paragraphs)
     return content.decode('utf-8', errors='ignore')
 
-
+from fastapi import Form
 @app.post('/api/resume-analysis')
 async def resume_analysis(
     file: UploadFile = File(...),
