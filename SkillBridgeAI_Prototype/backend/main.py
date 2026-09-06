@@ -20,14 +20,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
-import anthropic
+from groq import Groq
 
 BASE = Path(__file__).resolve().parent.parent
 DATA = BASE / 'data'
 DATABASE_PATH = Path(os.getenv('DATABASE_PATH', BASE / 'skillbridge.db'))
 SECRET_KEY = os.getenv('SECRET_KEY', 'change-this-local-development-secret')
 TOKEN_TTL_HOURS = int(os.getenv('TOKEN_TTL_HOURS', '168'))
-claude_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 JOBS_FILE = DATA / 'job_postings_cleaned.xlsx'
 JOB_SKILLS_FILE = DATA / 'job_skills_cleaned.xlsx'
@@ -174,6 +175,16 @@ TOTAL_JOBS = int(len(jobs))
 TOTAL_COURSES = int(len(courses))
 TOTAL_STUDENTS = int(len(students))
 PLACEMENT_RATE = round(float((students['Placement_Status'].astype(str).str.lower() == 'placed').mean()) * 100, 1)
+
+
+ALL_ROLE_TITLES = sorted(jobs['title'].str.strip().replace('', np.nan).dropna().unique().tolist(), key=len, reverse=True)
+
+def detect_role_in_text(text: str) -> str | None:
+    t = text.lower()
+    for title in ALL_ROLE_TITLES:
+        if title.lower() in t:
+            return title
+    return None
 
 
 def role_rows(role: str):
@@ -325,6 +336,16 @@ class LearningPathRequest(BaseModel):
     current_skills: list[str] = Field(default_factory=list)
     weeks_available: int = Field(8, ge=1, le=52)
 
+
+class ChatMessage(BaseModel):
+    role: str  # 'user' or 'assistant'
+    content: str = Field(max_length=2000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    history: list[ChatMessage] = Field(default_factory=list)
+
 @app.get('/api/health')
 def health():
     return {'status':'ok','message':'SkillBridge AI backend is running'}
@@ -384,8 +405,7 @@ def role_analysis(role: str, location: str = '', experience: str = '', work_type
         'data_note': 'Current job postings are a cross-sectional sample; use skill prevalence rather than year-over-year growth.'
     }
 
-@app.get('/api/courses')
-def course_recommendations(role: str, limit: int = Query(8, ge=1, le=20), location: str = '', experience: str = '', work_type: str = '', min_salary: float | None = Query(None, ge=0)):
+def score_courses(role: str, limit: int = 8, location: str = '', experience: str = '', work_type: str = '', min_salary: float | None = None):
     subset = filtered_role_rows(role, location, experience, work_type, min_salary)
     demand = demand_for_role(subset)
     demand_map = {x['skill'].lower(): x['demand_percent']/100 for x in demand}
@@ -411,6 +431,11 @@ def course_recommendations(role: str, limit: int = Query(8, ge=1, le=20), locati
         })
     scored.sort(key=lambda x:x['alignment_percent'], reverse=True)
     return scored[:limit]
+
+
+@app.get('/api/courses')
+def course_recommendations(role: str, limit: int = Query(8, ge=1, le=20), location: str = '', experience: str = '', work_type: str = '', min_salary: float | None = Query(None, ge=0)):
+    return score_courses(role, limit, location, experience, work_type, min_salary)
 
 @app.post('/api/assessment')
 def assessment(a: Assessment, authorization: str | None = Header(default=None)):
@@ -531,12 +556,67 @@ Write a short, warm welcome-back message (2-3 sentences). Mention their readines
 name their single biggest skill gap, and give one encouraging, concrete suggestion for what
 to focus on next. No headers, no bullet points, casual and motivating tone."""
 
-    message = claude_client.messages.create(
-        model='claude-sonnet-4-6',
+    message = groq_client.chat.completions.create(
+        model=GROQ_MODEL,
         max_tokens=200,
         messages=[{'role': 'user', 'content': prompt}]
     )
-    return {'greeting': message.content[0].text}
+    return {'greeting': message.choices[0].message.content}
+
+
+@app.post('/api/chat')
+def chat(req: ChatRequest, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+
+    # Pull the student's real latest assessment for context.
+    with db_connection() as conn:
+        latest = conn.execute(
+            'SELECT target_role, readiness_score, skill_gaps FROM assessments '
+            'WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,)
+        ).fetchone()
+
+    context_parts = []
+    if latest:
+        gaps = json.loads(latest['skill_gaps'])
+        gap_text = ', '.join(f"{g['skill']} ({g['gap_percent']}% gap)" for g in gaps[:5]) or 'none recorded'
+        context_parts.append(
+            f"Student's last assessment: target role '{latest['target_role']}', "
+            f"readiness {latest['readiness_score']}%, skill gaps: {gap_text}."
+        )
+    else:
+        context_parts.append("This student has not completed an assessment yet.")
+
+    # If the user's message mentions a specific role, pull REAL demand + course data for it.
+    detected_role = detect_role_in_text(req.message)
+    if detected_role:
+        demand = demand_for_role(role_rows(detected_role))[:8]
+        top_courses = score_courses(detected_role, limit=3)
+        if demand:
+            skill_text = ', '.join(f"{d['skill']} ({d['demand_percent']}% of postings)" for d in demand)
+            context_parts.append(f"Real job-posting data for '{detected_role}': top in-demand skills are {skill_text}.")
+        if top_courses:
+            course_text = '; '.join(f"{c['title']} by {c['organization']} ({c['alignment_percent']}% match)" for c in top_courses)
+            context_parts.append(f"Top matching courses for '{detected_role}': {course_text}.")
+
+    system_prompt = (
+        "You are the SkillBridge AI assistant, a career-guidance chat helper for students. "
+        "Only use the factual data given to you below about this student and about job/course data. "
+        "Do not invent job requirements, statistics, or course names that are not provided to you. "
+        "If you don't have real data for something the student asks, say so honestly and suggest "
+        "they try a specific role name instead. Keep answers short (3-5 sentences), warm, and practical.\n\n"
+        "FACTS YOU CAN USE:\n" + "\n".join(context_parts)
+    )
+
+    groq_messages = [{'role': 'system', 'content': system_prompt}]
+    groq_messages += [{'role': m.role, 'content': m.content} for m in req.history]
+    groq_messages.append({'role': 'user', 'content': req.message})
+
+    response = groq_client.chat.completions.create(
+        model=GROQ_MODEL,
+        max_tokens=400,
+        messages=groq_messages
+    )
+    return {'reply': response.choices[0].message.content, 'detected_role': detected_role}
 
 
 def read_resume_text(filename: str, content: bytes) -> str:
