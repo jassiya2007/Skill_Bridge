@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import pandas as pd
@@ -631,7 +631,10 @@ def read_resume_text(filename: str, content: bytes) -> str:
 
 
 @app.post('/api/resume-analysis')
-async def resume_analysis(file: UploadFile = File(...), target_role: str = 'Data Analyst'):
+async def resume_analysis(
+    file: UploadFile = File(...),
+    target_role: str = Form(...)
+):
     content = await file.read()
     if len(content) > 5_000_000:
         raise HTTPException(status_code=413, detail='Please upload a résumé smaller than 5 MB.')
