@@ -54,7 +54,6 @@ function openAssessment(){
           <label>Target role<select name="target_role" id="targetRole"></select></label>
           <div class="sb-grid">
             <label>CGPA<input name="cgpa" type="number" step="0.01" min="0" max="4" value="3.2"></label>
-            <label>Attendance %<input name="attendance" type="number" min="0" max="100" value="85"></label>
             <label>Programming / 10<input name="programming" type="number" min="0" max="10" value="7"></label>
             <label>Projects<input name="projects" type="number" min="0" max="20" value="4"></label>
             <label>Internships<input name="internships" type="number" min="0" max="10" value="2"></label>
@@ -89,7 +88,7 @@ async function submitAssessment(e){
   const f=new FormData(e.target);
   const num=k=>Number(f.get(k));
   const payload={
-    target_role:f.get('target_role'), cgpa:num('cgpa'), attendance:num('attendance'), programming:num('programming'),
+    target_role:f.get('target_role'), cgpa:num('cgpa'), programming:num('programming'),
     projects:num('projects'), internships:num('internships'), communication:num('communication'),
     problem_solving:num('problem_solving'), interview_score:num('interview_score'), study_hours:10,
     certifications:1,hackathons:1,leadership:6,resume_score:75,teamwork:7,english:7
