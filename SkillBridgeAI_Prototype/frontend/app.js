@@ -147,23 +147,27 @@ async function analyzeRole(){
 }
 
 function openAccount(){
+
   let modal = $('#accountModal');
 
-  if(!modal){
+  if (!modal) {
+
     modal = document.createElement('div');
+
     modal.id = 'accountModal';
     modal.className = 'sb-modal';
 
     modal.innerHTML = `
       <div class="sb-modal-card">
+
         <button class="sb-close" aria-label="Close">×</button>
 
-        <div class="badge">LOCAL ACCOUNT</div>
+        <div class="badge">SKILLBRIDGE ACCOUNT</div>
 
-        <h2>Save your progress</h2>
+        <h2>Login to SkillBridge</h2>
 
         <p class="sb-muted">
-          Create an account or log in to save your SkillBridge progress.
+          Sign in to save your assessments and career progress.
         </p>
 
         <form id="accountForm" class="sb-form">
@@ -173,7 +177,7 @@ function openAccount(){
             <input
               name="email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="Enter your email"
               required
             >
           </label>
@@ -183,7 +187,7 @@ function openAccount(){
             <input
               name="password"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder="Enter your password"
               minlength="8"
               required
             >
@@ -195,18 +199,18 @@ function openAccount(){
               class="btn btn-primary"
               type="submit"
               name="mode"
-              value="register"
+              value="login"
             >
-              Create account
+              Log in
             </button>
 
             <button
               class="btn btn-outline"
               type="submit"
               name="mode"
-              value="login"
+              value="register"
             >
-              Log in
+              Create account
             </button>
 
           </div>
@@ -220,105 +224,91 @@ function openAccount(){
 
     document.body.appendChild(modal);
 
-    modal.addEventListener('click', e => {
-      if(
+    modal.addEventListener('click', function(e){
+
+      if (
         e.target === modal ||
         e.target.classList.contains('sb-close')
-      ){
+      ) {
         modal.classList.remove('show');
       }
+
     });
 
-    $('#accountForm').addEventListener('submit', async e => {
+    $('#accountForm').addEventListener('submit', async function(e){
 
       e.preventDefault();
 
       const form = new FormData(e.target);
 
-      const mode = e.submitter?.value || 'login';
+      const mode = e.submitter
+        ? e.submitter.value
+        : 'login';
 
       const out = $('#accountResult');
 
-      const email = String(form.get('email') || '').trim();
-      const password = String(form.get('password') || '');
-
-      if(!email || !password){
-        out.innerHTML = `
-          <div class="sb-error">
-            Please enter your email and password.
-          </div>
-        `;
-        return;
-      }
-
       out.innerHTML = `
         <div class="sb-loading">
-          ${mode === 'login' ? 'Logging in…' : 'Creating your account…'}
+          Please wait...
         </div>
       `;
 
-      try{
+      try {
 
-        const d = await api(`/auth/${mode}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email: email,
-            password: password
-          })
-        });
+        const response = await api(
+          `/auth/${mode}`,
+          {
+            method: 'POST',
 
-        if(!d || !d.token){
-          throw new Error('The server did not return a login token.');
-        }
+            headers: {
+              'Content-Type': 'application/json'
+            },
+
+            body: JSON.stringify({
+              email: form.get('email'),
+              password: form.get('password')
+            })
+          }
+        );
 
         localStorage.setItem(
           'skillbridge_token',
-          d.token
+          response.token
         );
 
         localStorage.setItem(
           'skillbridge_email',
-          d.email
+          response.email
         );
 
         out.innerHTML = `
           <div class="sb-note">
-            ✅ ${mode === 'login'
-              ? 'Login successful!'
-              : 'Account created successfully!'}
-            <br>
-            <small>Welcome to SkillBridge.</small>
+            ✅ Login successful!<br>
+            Welcome back, ${escapeHtml(response.email)}
           </div>
         `;
 
-        setTimeout(() => {
+        setTimeout(function(){
           modal.classList.remove('show');
         }, 1500);
 
-      }catch(err){
+      } catch (err) {
 
-        console.error('Account error:', err);
+        console.error('Login error:', err);
 
-        let message = 'Could not sign in. Please try again.';
+        let message =
+          'Could not sign in. Please try again.';
 
-        try{
+        try {
 
-          const errorData = JSON.parse(err.message);
+          const errorData =
+            JSON.parse(err.message);
 
-          if(errorData.detail){
+          if (errorData.detail) {
             message = errorData.detail;
           }
 
-        }catch(_){
-
-          if(err.message){
-            message = err.message;
-          }
-
-        }
+        } catch (_) {}
 
         out.innerHTML = `
           <div class="sb-error">
@@ -332,7 +322,6 @@ function openAccount(){
 
   modal.classList.add('show');
 }
-
 function addCareerTools(){
   if($('#careerTools')) return;
   const section=document.createElement('section'); section.id='careerTools'; section.className='sb-live-section';
@@ -401,23 +390,55 @@ async function loadHistory(){
 }
 
 function wireButtons(){
-  const actions = [...$$('button')].filter(b =>
-    /Start Skill Assessment|Start Your Skill Assessment|Get Started|Explore Platform|Skill Assessment/i.test(b.textContent)
-  );
 
-  actions.forEach(b => b.addEventListener('click', () => {
-    if(/Explore Platform/i.test(b.textContent)){
-      $('#careerTools')?.scrollIntoView({behavior:'smooth'});
-    } else {
-      openAssessment();
+  // Login buttons
+  $$('button').forEach(button => {
+
+    const text = button.textContent.trim();
+
+    if (/log in/i.test(text)) {
+
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('LOGIN BUTTON CLICKED');
+
+        openAccount();
+      });
     }
-  }));
 
-  [...$$('button')]
-    .filter(b => /Log In/i.test(b.textContent))
-    .forEach(b => b.addEventListener('click', openAccount));
+    // Skill Assessment buttons
+    if (
+      /Start Skill Assessment|Start Your Skill Assessment|Get Started|Skill Assessment/i.test(text)
+    ) {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        openAssessment();
+      });
+    }
+
+    // Explore Platform
+    if (/Explore Platform/i.test(text)) {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const careerTools = $('#careerTools');
+
+        if (careerTools) {
+          careerTools.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    }
+
+  });
 }
-
 window.addEventListener('DOMContentLoaded',()=>{
   addCareerTools();
   wireButtons();
