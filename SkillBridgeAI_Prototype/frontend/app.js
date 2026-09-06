@@ -154,7 +154,21 @@ function openAccount(){
     modal.innerHTML=`<div class="sb-modal-card"><button class="sb-close" aria-label="Close">×</button><div class="badge">LOCAL ACCOUNT</div><h2>Save your progress</h2><p class="sb-muted">Your account and assessment history are stored locally in this prototype.</p><form id="accountForm" class="sb-form"><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><div class="hero-buttons"><button class="btn btn-primary" name="mode" value="register">Create account</button><button class="btn btn-outline" name="mode" value="login">Log in</button></div></form><div id="accountResult" class="sb-result"></div></div>`;
     document.body.appendChild(modal);
     modal.addEventListener('click',e=>{if(e.target===modal||e.target.classList.contains('sb-close'))modal.classList.remove('show');});
-    $('#accountForm').addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.target);const mode=e.submitter?.value||'login';const out=$('#accountResult');try{const d=await api(`/auth/${mode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:form.get('email'),password:form.get('password')})});localStorage.setItem('skillbridge_token',d.token);localStorage.setItem('skillbridge_email',d.email);out.innerHTML='<div class="sb-note">Signed in. Future assessments will be saved.</div>';setTimeout(()=>modal.classList.remove('show'),700);}catch(err){out.innerHTML='<div class="sb-error">Could not sign in. Use a valid email and a password of at least 8 characters.</div>';}});
+    $('#accountForm').addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.target);const mode=e.submitter?.value||'login';const out=$('#accountResult');try{const d=await api(`/auth/${mode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:form.get('email'),password:form.get('password')})});localStorage.setItem('skillbridge_token',d.token);localStorage.setItem('skillbridge_email',d.email);out.innerHTML='<div class="sb-note">Signed in. Future assessments will be saved.</div>';setTimeout(()=>modal.classList.remove('show'),700);}catch(err){
+  let message = 'Could not sign in. Please try again.';
+
+  try {
+    const errorData = JSON.parse(err.message);
+
+    if (errorData.detail) {
+      message = errorData.detail;
+    }
+  } catch (_) {
+    // Keep the default message if the response is not JSON
+  }
+
+  out.innerHTML = `<div class="sb-error">${escapeHtml(message)}</div>`;
+}});
   }
   modal.classList.add('show');
 }
