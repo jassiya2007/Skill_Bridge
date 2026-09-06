@@ -1732,7 +1732,7 @@ footer {
 .sb-live-section{padding:110px 7%;background:#fff}
 .sb-live-card{max-width:1250px;margin:auto;padding:30px;border:1px solid var(--border);border-radius:22px;background:#fff;box-shadow:0 25px 70px rgba(30,30,70,.07)}
 .sb-controls{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;margin-bottom:28px}
-.sb-filter-controls{grid-template-columns:repeat(5,minmax(130px,1fr)) auto}
+.sb-filter-controls {grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));gap: 14px;}
 .sb-controls label,.sb-form label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700;color:var(--dark)}
 .sb-controls input,.sb-controls select,.sb-form input,.sb-form select{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--dark);outline:none}
 .sb-controls input:focus,.sb-controls select:focus,.sb-form input:focus,.sb-form select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(98,87,232,.08)}
