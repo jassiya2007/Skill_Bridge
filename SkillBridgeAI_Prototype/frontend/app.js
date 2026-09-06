@@ -209,8 +209,6 @@ function wireButtons(){
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
-  addLiveIntelligenceSection();
-  addCareerTools();
   wireButtons();
   loadOverview();
 });
