@@ -108,22 +108,6 @@ async function submitAssessment(e){
   }catch(err){ out.innerHTML=`<div class="sb-error">Could not reach the backend. Start the FastAPI server on port 8000.</div>`; }
 }
 
-function addLiveIntelligenceSection(){
-  if($('#liveIntelligence')) return;
-  const section=document.createElement('section');
-  section.id='liveIntelligence';
-  section.className='sb-live-section';
-  section.innerHTML=`
-    <div class="section-heading"><div class="badge">LIVE DATA INTELLIGENCE</div><h2>Turn industry demand into <span>actionable skill gaps.</span></h2><p>Select a role and let the connected datasets power the analysis.</p></div>
-    <div class="sb-live-card">
-      <div class="sb-controls sb-filter-controls"><label>Job role<select id="liveRole"></select></label><label>Location<input id="liveLocation" placeholder="e.g. New York"></label><label>Experience<input id="liveExperience" placeholder="e.g. Entry level"></label><label>Work type<input id="liveWorkType" placeholder="e.g. Full-time"></label><label>Minimum salary (₹)<input id="liveMinSalary" type="number" min="0" placeholder="Optional"></label><button id="analyzeRole" class="btn btn-primary btn-large">Analyze →</button></div>
-      <div id="liveResult" class="sb-live-result"><div class="sb-empty">Choose a role to see demand, salary, skills and course recommendations.</div></div>
-    </div>`;
-  const anchor=$('.dashboard-section');
-  anchor?.after(section);
-  loadRolesInto($('#liveRole'));
-  $('#analyzeRole').addEventListener('click', analyzeRole);
-}
 
 async function analyzeRole(){
   const role=$('#liveRole').value; const location=$('#liveLocation').value.trim();
