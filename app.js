@@ -6,14 +6,39 @@ const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 function fmt(n){ return new Intl.NumberFormat('en-IN').format(n); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
-async function api(path, options={}){
-  const token=localStorage.getItem('skillbridge_token');
-  const headers={...(options.headers||{})};
-  if(token) headers.Authorization=`Bearer ${token}`;
-  const res = await fetch(API_BASE + path, {...options,headers});
-  if(!res.ok) throw new Error(await res.text());
-  return res.json();
+async function api(path, options = {}) {
+const token = localStorage.getItem('skillbridge_token');
+
+const headers = {
+...(options.headers || {})
+};
+
+if (token) {
+headers.Authorization = `Bearer ${token}`;
 }
+
+const res = await fetch(API_BASE + path, {
+...options,
+headers
+});
+
+const text = await res.text();
+
+let data;
+
+try {
+data = text ? JSON.parse(text) : {};
+} catch {
+data = { detail: text || 'Unknown server error' };
+}
+
+if (!res.ok) {
+throw new Error(data.detail || 'Request failed');
+}
+
+return data;
+}
+
 
 function setText(selector, value){ const el=$(selector); if(el) el.textContent=value; }
 
@@ -131,30 +156,193 @@ async function analyzeRole(){
 }
 
 function openAccount(){
-  let modal=$('#accountModal');
-  if(!modal){
-    modal=document.createElement('div'); modal.id='accountModal'; modal.className='sb-modal';
-    modal.innerHTML=`<div class="sb-modal-card"><button class="sb-close" aria-label="Close">×</button><div class="badge">LOCAL ACCOUNT</div><h2>Save your progress</h2><p class="sb-muted">Your account and assessment history are stored locally in this prototype.</p><form id="accountForm" class="sb-form"><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><div class="hero-buttons"><button class="btn btn-primary" name="mode" value="register">Create account</button><button class="btn btn-outline" name="mode" value="login">Log in</button></div></form><div id="accountResult" class="sb-result"></div></div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click',e=>{if(e.target===modal||e.target.classList.contains('sb-close'))modal.classList.remove('show');});
-    $('#accountForm').addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.target);const mode=e.submitter?.value||'login';const out=$('#accountResult');try{const d=await api(`/auth/${mode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:form.get('email'),password:form.get('password')})});localStorage.setItem('skillbridge_token',d.token);localStorage.setItem('skillbridge_email',d.email);out.innerHTML='<div class="sb-note">Signed in. Future assessments will be saved.</div>';setTimeout(()=>modal.classList.remove('show'),700);}catch(err){
-  let message = 'Could not sign in. Please try again.';
+let modal = $('#accountModal');
+
+if(!modal){
+modal = document.createElement('div');
+modal.id = 'accountModal';
+modal.className = 'sb-modal';
+
+```
+modal.innerHTML = `
+  <div class="sb-modal-card">
+
+    <button class="sb-close" aria-label="Close">×</button>
+
+    <div class="badge">LOCAL ACCOUNT</div>
+
+    <h2>Save your progress</h2>
+
+    <p class="sb-muted">
+      Your account and assessment history are stored locally in this prototype.
+    </p>
+
+    <form id="accountForm" class="sb-form">
+
+      <label>
+        Email
+        <input
+          name="email"
+          type="email"
+          placeholder="you@example.com"
+          required
+        >
+      </label>
+
+      <label>
+        Password
+        <input
+          name="password"
+          type="password"
+          minlength="8"
+          placeholder="At least 8 characters"
+          required
+        >
+      </label>
+
+      <div class="hero-buttons">
+
+        <button
+          class="btn btn-primary"
+          type="submit"
+          name="mode"
+          value="register">
+          Create account
+        </button>
+
+        <button
+          class="btn btn-outline"
+          type="submit"
+          name="mode"
+          value="login">
+          Log in
+        </button>
+
+      </div>
+
+    </form>
+
+    <div id="accountResult" class="sb-result"></div>
+
+  </div>
+`;
+
+document.body.appendChild(modal);
+
+// Close popup
+modal.addEventListener('click', e => {
+  if (
+    e.target === modal ||
+    e.target.classList.contains('sb-close')
+  ) {
+    modal.classList.remove('show');
+  }
+});
+
+// Login / Register
+$('#accountForm').addEventListener('submit', async e => {
+
+  e.preventDefault();
+
+  const form = new FormData(e.target);
+  const mode = e.submitter?.value || 'login';
+  const out = $('#accountResult');
+
+  const email = String(form.get('email') || '').trim();
+  const password = String(form.get('password') || '');
+
+  // Show loading
+  out.innerHTML = `
+    <div class="sb-note">
+      ${mode === 'login'
+        ? '⏳ Logging in...'
+        : '⏳ Creating your account...'}
+    </div>
+  `;
 
   try {
-    const errorData = JSON.parse(err.message);
 
-    if (errorData.detail) {
-      message = errorData.detail;
+    const data = await api(`/auth/${mode}`, {
+      method: 'POST',
+
+      headers: {
+        'Content-Type': 'application/json'
+      },
+
+      body: JSON.stringify({
+        email: email,
+        password: password
+      })
+    });
+
+    // Make sure backend returned a token
+    if (!data.token) {
+      throw new Error('Login succeeded but no authentication token was returned.');
     }
-  } catch (_) {
-    // Keep the default message if the response is not JSON
-  }
 
-  out.innerHTML = `<div class="sb-error">${escapeHtml(message)}</div>`;
-}});
+    // Save login session
+    localStorage.setItem(
+      'skillbridge_token',
+      data.token
+    );
+
+    localStorage.setItem(
+      'skillbridge_email',
+      data.email
+    );
+
+    // SUCCESS MESSAGE
+    out.innerHTML = `
+      <div class="sb-note" style="
+        padding: 14px;
+        margin-top: 12px;
+        border-radius: 10px;
+        font-weight: 600;
+      ">
+        ✅ ${mode === 'login'
+          ? 'Login successful!'
+          : 'Account created successfully!'}
+        <br>
+        <small>
+          Welcome, ${escapeHtml(data.email)}
+        </small>
+      </div>
+    `;
+
+    // Change Log In buttons to Account
+    $$('button').forEach(button => {
+      if (/Log In/i.test(button.textContent.trim())) {
+        button.textContent = 'Account';
+      }
+    });
+
+    // Close popup after showing success
+    setTimeout(() => {
+      modal.classList.remove('show');
+    }, 1500);
+
+  } catch(err) {
+
+    console.error('Authentication error:', err);
+
+    out.innerHTML = `
+      <div class="sb-error" style="
+        padding: 14px;
+        margin-top: 12px;
+        border-radius: 10px;
+      ">
+        ❌ ${escapeHtml(err.message || 'Could not sign in. Please try again.')}
+      </div>
+    `;
   }
-  modal.classList.add('show');
+});
+```
+
 }
+
+modal.classList.add('show');
+}
+
 
 function addCareerTools(){
   if($('#careerTools')) return;
