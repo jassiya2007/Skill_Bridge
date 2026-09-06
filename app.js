@@ -162,7 +162,12 @@ function addCareerTools(){
   const section=document.createElement('section'); section.id='careerTools'; section.className='sb-live-section';
   section.innerHTML=`<div class="section-heading"><div class="badge">YOUR CAREER TOOLKIT</div><h2>Build a practical <span>next-step plan.</span></h2><p>Use your résumé, target role, and available time to turn insight into action.</p></div><div class="sb-live-card"><div class="sb-columns"><div><h3>Résumé skill scan</h3><form id="resumeForm" class="sb-form"><label>Target role<select id="resumeRole"></select></label><label>Résumé (PDF, DOCX, or TXT)<input name="file" type="file" accept=".pdf,.docx,.txt" required></label><button class="btn btn-primary" type="submit">Analyze résumé →</button></form><div id="resumeResult" class="sb-result"></div></div><div><h3>Personal learning roadmap</h3><form id="roadmapForm" class="sb-form"><label>Target role<select id="roadmapRole"></select></label><label>Skills you already have<input name="skills" placeholder="e.g. Python, Excel, SQL"></label><label>Weeks available<input name="weeks" type="number" min="1" max="52" value="8"></label><button class="btn btn-primary" type="submit">Create roadmap →</button></form><div id="roadmapResult" class="sb-result"></div><button id="historyButton" class="btn btn-outline" type="button">View saved assessments</button><div id="historyResult" class="sb-result"></div></div></div></div>`;
   const anchor = $('.dashboard-section');
-anchor?.after(section);
+
+if (anchor) {
+  anchor.after(section);
+} else {
+  document.body.appendChild(section);
+}
   loadRolesInto($('#resumeRole')); loadRolesInto($('#roadmapRole'));
   $('#resumeForm').addEventListener('submit',submitResume);
   $('#roadmapForm').addEventListener('submit',submitRoadmap);
@@ -185,21 +190,44 @@ async function loadHistory(){
 }
 
 function wireButtons(){
-  const actions = [...$$('button')].filter(b =>
-    /Start Skill Assessment|Start Your Skill Assessment|Get Started|Explore Platform|Skill Assessment/i.test(b.textContent)
-  );
 
-  actions.forEach(b => b.addEventListener('click', () => {
-    if(/Explore Platform/i.test(b.textContent)){
-      $('#careerTools')?.scrollIntoView({behavior:'smooth'});
-    } else {
-      openAssessment();
+  // Get Started / Skill Assessment buttons
+  [...$$('button')].forEach(button => {
+    const text = button.textContent.trim();
+
+    if (
+      /Start Skill Assessment|Start Your Skill Assessment|Get Started|Skill Assessment/i.test(text)
+    ) {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAssessment();
+      });
     }
-  }));
 
-  [...$$('button')]
-    .filter(b => /Log In/i.test(b.textContent))
-    .forEach(b => b.addEventListener('click', openAccount));
+    // Explore Platform
+    if (/Explore Platform/i.test(text)) {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+
+        const careerTools = $('#careerTools');
+
+        if (careerTools) {
+          careerTools.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    }
+
+    // Login
+    if (/Log In/i.test(text)) {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAccount();
+      });
+    }
+  });
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
