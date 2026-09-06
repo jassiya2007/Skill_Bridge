@@ -20,12 +20,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score
+import anthropic
 
 BASE = Path(__file__).resolve().parent.parent
 DATA = BASE / 'data'
 DATABASE_PATH = Path(os.getenv('DATABASE_PATH', BASE / 'skillbridge.db'))
 SECRET_KEY = os.getenv('SECRET_KEY', 'change-this-local-development-secret')
 TOKEN_TTL_HOURS = int(os.getenv('TOKEN_TTL_HOURS', '168'))
+claude_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
 JOBS_FILE = DATA / 'job_postings_cleaned.xlsx'
 JOB_SKILLS_FILE = DATA / 'job_skills_cleaned.xlsx'
@@ -496,6 +498,45 @@ def saved_assessments(authorization: str | None = Header(default=None)):
             (user_id,)
         ).fetchall()
     return [{**dict(row), 'skill_gaps': json.loads(row['skill_gaps'])} for row in rows]
+
+
+@app.get('/api/ai-greeting')
+def ai_greeting(authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    with db_connection() as conn:
+        latest = conn.execute(
+            'SELECT target_role, placement_probability, readiness_score, skill_gaps, created_at '
+            'FROM assessments WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+            (user_id,)
+        ).fetchone()
+
+    if latest is None:
+        return {
+            'greeting': "Welcome to SkillBridge AI! Take your first skill assessment and I'll "
+                        "start giving you personalized guidance on where to focus your learning."
+        }
+
+    gaps = json.loads(latest['skill_gaps'])
+    gap_summary = ', '.join(f"{g['skill']} ({g['gap_percent']}% gap)" for g in gaps[:3]) or 'no major gaps detected'
+
+    prompt = f"""You're an encouraging skill-development coach for a platform called SkillBridge AI.
+
+This student's most recent assessment:
+- Target role: {latest['target_role']}
+- Readiness score: {latest['readiness_score']}%
+- Placement probability: {latest['placement_probability']}%
+- Top skill gaps: {gap_summary}
+
+Write a short, warm welcome-back message (2-3 sentences). Mention their readiness score,
+name their single biggest skill gap, and give one encouraging, concrete suggestion for what
+to focus on next. No headers, no bullet points, casual and motivating tone."""
+
+    message = claude_client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=200,
+        messages=[{'role': 'user', 'content': prompt}]
+    )
+    return {'greeting': message.content[0].text}
 
 
 def read_resume_text(filename: str, content: bytes) -> str:
