@@ -185,8 +185,48 @@ anchor?.after(section);
 }
 
 async function submitResume(e){
-  e.preventDefault(); const form=new FormData(e.target); form.append('target_role',$('#resumeRole').value); const out=$('#resumeResult'); out.innerHTML='<div class="sb-loading">Reading résumé…</div>';
-  try{const d=await api('/resume-analysis',{method:'POST',body:form});out.innerHTML=`<h3>Recognized skills</h3><p>${d.detected_skills.length?d.detected_skills.map(escapeHtml).join(' · '):'No matching skills were found.'}</p><h3>Priority gaps for ${escapeHtml(d.target_role)}</h3>${d.skill_gaps.map(g=>`<div class="sb-gap"><span>${escapeHtml(g.skill)}</span><b>${g.demand_percent}% demand</b></div>`).join('')||'<p>No major gaps found.</p>'}`;}catch(err){out.innerHTML='<div class="sb-error">Could not read this résumé. Upload a text-based PDF, DOCX, or TXT file.</div>';}
+  e.preventDefault();
+
+  const form = new FormData(e.target);
+  const selectedRole = $('#resumeRole').value;
+
+  form.append('target_role', selectedRole);
+
+  const out = $('#resumeResult');
+  out.innerHTML = '<div class="sb-loading">Reading résumé…</div>';
+
+  try {
+    const d = await api('/resume-analysis', {
+      method: 'POST',
+      body: form
+    });
+
+    out.innerHTML = `
+      <h3>Recognized skills</h3>
+      <p>
+        ${d.detected_skills.length
+          ? d.detected_skills.map(escapeHtml).join(' · ')
+          : 'No matching skills were found.'
+        }
+      </p>
+
+      <h3>Priority gaps for ${escapeHtml(selectedRole)}</h3>
+
+      ${
+        d.skill_gaps.map(g => `
+          <div class="sb-gap">
+            <span>${escapeHtml(g.skill)}</span>
+            <b>${g.demand_percent}% demand</b>
+          </div>
+        `).join('')
+        || '<p>No major gaps found.</p>'
+      }
+    `;
+
+  } catch(err) {
+    out.innerHTML =
+      '<div class="sb-error">Could not read this résumé. Upload a text-based PDF, DOCX, or TXT file.</div>';
+  }
 }
 
 async function submitRoadmap(e){
