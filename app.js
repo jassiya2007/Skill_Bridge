@@ -187,7 +187,7 @@ async function loadHistory(){
 function wireButtons(){
   const actions=[...$$('button')].filter(b=>/Start Skill Assessment|Start Your Skill Assessment|Get Started|Explore Platform|Skill Assessment/i.test(b.textContent));
   actions.forEach(b=>b.addEventListener('click', ()=>{
-    if(/Explore Platform/i.test(b.textContent)){ $('#liveIntelligence')?.scrollIntoView({behavior:'smooth'}); }
+    if(/Explore Platform/i.test(b.textContent))
     else openAssessment();
   }));
   [...$$('button')].filter(b=>/Log In/i.test(b.textContent)).forEach(b=>b.addEventListener('click',openAccount));
