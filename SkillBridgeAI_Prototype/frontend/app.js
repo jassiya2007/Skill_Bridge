@@ -147,28 +147,189 @@ async function analyzeRole(){
 }
 
 function openAccount(){
-  let modal=$('#accountModal');
+  let modal = $('#accountModal');
+
   if(!modal){
-    modal=document.createElement('div'); modal.id='accountModal'; modal.className='sb-modal';
-    modal.innerHTML=`<div class="sb-modal-card"><button class="sb-close" aria-label="Close">×</button><div class="badge">LOCAL ACCOUNT</div><h2>Save your progress</h2><p class="sb-muted">Your account and assessment history are stored locally in this prototype.</p><form id="accountForm" class="sb-form"><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><div class="hero-buttons"><button class="btn btn-primary" name="mode" value="register">Create account</button><button class="btn btn-outline" name="mode" value="login">Log in</button></div></form><div id="accountResult" class="sb-result"></div></div>`;
+    modal = document.createElement('div');
+    modal.id = 'accountModal';
+    modal.className = 'sb-modal';
+
+    modal.innerHTML = `
+      <div class="sb-modal-card">
+        <button class="sb-close" aria-label="Close">×</button>
+
+        <div class="badge">LOCAL ACCOUNT</div>
+
+        <h2>Save your progress</h2>
+
+        <p class="sb-muted">
+          Create an account or log in to save your SkillBridge progress.
+        </p>
+
+        <form id="accountForm" class="sb-form">
+
+          <label>
+            Email
+            <input
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              required
+            >
+          </label>
+
+          <label>
+            Password
+            <input
+              name="password"
+              type="password"
+              placeholder="Minimum 8 characters"
+              minlength="8"
+              required
+            >
+          </label>
+
+          <div class="hero-buttons">
+
+            <button
+              class="btn btn-primary"
+              type="submit"
+              name="mode"
+              value="register"
+            >
+              Create account
+            </button>
+
+            <button
+              class="btn btn-outline"
+              type="submit"
+              name="mode"
+              value="login"
+            >
+              Log in
+            </button>
+
+          </div>
+
+        </form>
+
+        <div id="accountResult" class="sb-result"></div>
+
+      </div>
+    `;
+
     document.body.appendChild(modal);
-    modal.addEventListener('click',e=>{if(e.target===modal||e.target.classList.contains('sb-close'))modal.classList.remove('show');});
-    $('#accountForm').addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.target);const mode=e.submitter?.value||'login';const out=$('#accountResult');try{const d=await api(`/auth/${mode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:form.get('email'),password:form.get('password')})});localStorage.setItem('skillbridge_token',d.token);localStorage.setItem('skillbridge_email',d.email);out.innerHTML='<div class="sb-note">Signed in. Future assessments will be saved.</div>';setTimeout(()=>modal.classList.remove('show'),700);}catch(err){
-  let message = 'Could not sign in. Please try again.';
 
-  try {
-    const errorData = JSON.parse(err.message);
+    modal.addEventListener('click', e => {
+      if(
+        e.target === modal ||
+        e.target.classList.contains('sb-close')
+      ){
+        modal.classList.remove('show');
+      }
+    });
 
-    if (errorData.detail) {
-      message = errorData.detail;
-    }
-  } catch (_) {
-    // Keep the default message if the response is not JSON
+    $('#accountForm').addEventListener('submit', async e => {
+
+      e.preventDefault();
+
+      const form = new FormData(e.target);
+
+      const mode = e.submitter?.value || 'login';
+
+      const out = $('#accountResult');
+
+      const email = String(form.get('email') || '').trim();
+      const password = String(form.get('password') || '');
+
+      if(!email || !password){
+        out.innerHTML = `
+          <div class="sb-error">
+            Please enter your email and password.
+          </div>
+        `;
+        return;
+      }
+
+      out.innerHTML = `
+        <div class="sb-loading">
+          ${mode === 'login' ? 'Logging in…' : 'Creating your account…'}
+        </div>
+      `;
+
+      try{
+
+        const d = await api(`/auth/${mode}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: email,
+            password: password
+          })
+        });
+
+        if(!d || !d.token){
+          throw new Error('The server did not return a login token.');
+        }
+
+        localStorage.setItem(
+          'skillbridge_token',
+          d.token
+        );
+
+        localStorage.setItem(
+          'skillbridge_email',
+          d.email
+        );
+
+        out.innerHTML = `
+          <div class="sb-note">
+            ✅ ${mode === 'login'
+              ? 'Login successful!'
+              : 'Account created successfully!'}
+            <br>
+            <small>Welcome to SkillBridge.</small>
+          </div>
+        `;
+
+        setTimeout(() => {
+          modal.classList.remove('show');
+        }, 1500);
+
+      }catch(err){
+
+        console.error('Account error:', err);
+
+        let message = 'Could not sign in. Please try again.';
+
+        try{
+
+          const errorData = JSON.parse(err.message);
+
+          if(errorData.detail){
+            message = errorData.detail;
+          }
+
+        }catch(_){
+
+          if(err.message){
+            message = err.message;
+          }
+
+        }
+
+        out.innerHTML = `
+          <div class="sb-error">
+            ❌ ${escapeHtml(message)}
+          </div>
+        `;
+      }
+
+    });
   }
 
-  out.innerHTML = `<div class="sb-error">${escapeHtml(message)}</div>`;
-}});
-  }
   modal.classList.add('show');
 }
 
